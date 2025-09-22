@@ -1,0 +1,52 @@
+{
+  "name": "ortho-denisa-app",
+  "version": "1.0.0",
+  "description": "Comprehensive orthodontist practice management system",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -o",
+    "dev": "npx live-server --port=8080 --open=/",
+    "build": "echo 'No build process needed - static files ready for deployment'",
+    "test": "echo 'Tests coming soon'",
+    "deploy": "echo 'Ready for deployment to any web server'"
+  },
+  "keywords": [
+    "orthodontist",
+    "dental",
+    "practice-management",
+    "healthcare",
+    "patient-management",
+    "appointments",
+    "billing",
+    "treatments",
+    "medical-software"
+  ],
+  "author": "Ortho-Denisa Development Team",
+  "license": "MIT",
+  "homepage": "https://orthodenisa.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orthodenisa/practice-management.git"
+  },
+  "bugs": {
+    "url": "https://github.com/orthodenisa/practice-management/issues",
+    "email": "support@orthodenisa.com"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "live-server": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ],
+  "config": {
+    "port": 8080,
+    "host": "localhost"
+  }
+}
