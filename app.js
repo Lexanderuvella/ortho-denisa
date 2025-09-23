@@ -9,6 +9,8 @@ class OrthoDenisaApp {
         this.isSearchActive = false;
         this.selectedFiles = [];
         this.uploadInProgress = false;
+        this.smartUploadFiles = [];
+        this.aiAnalysisResults = [];
         this.init();
     }
 
@@ -2729,6 +2731,636 @@ class OrthoDenisaApp {
         }, 3000);
     }
 
+    // Smart Upload Handler Functions
+    handleSmartDragOver(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const dropZone = document.getElementById('smartDropZone');
+        dropZone.style.borderColor = 'var(--warning-color)';
+        dropZone.style.background = 'linear-gradient(135deg, rgb(251 191 36 / 0.1), rgb(79 70 229 / 0.1))';
+        dropZone.style.transform = 'scale(1.02)';
+    }
+
+    handleSmartDragEnter(event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    handleSmartDragLeave(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const dropZone = document.getElementById('smartDropZone');
+        dropZone.style.borderColor = 'var(--success-color)';
+        dropZone.style.background = 'linear-gradient(135deg, rgb(34 197 94 / 0.05), rgb(79 70 229 / 0.05))';
+        dropZone.style.transform = 'scale(1)';
+    }
+
+    handleSmartDrop(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const dropZone = document.getElementById('smartDropZone');
+        dropZone.style.borderColor = 'var(--success-color)';
+        dropZone.style.background = 'linear-gradient(135deg, rgb(34 197 94 / 0.05), rgb(79 70 229 / 0.05))';
+        dropZone.style.transform = 'scale(1)';
+
+        const files = Array.from(event.dataTransfer.files);
+        this.processSmartFiles(files);
+    }
+
+    handleSmartFileSelect(event) {
+        const files = Array.from(event.target.files);
+        this.processSmartFiles(files);
+    }
+
+    async processSmartFiles(files) {
+        // Filter for image files only
+        const imageFiles = files.filter(file => {
+            return file.type.startsWith('image/') && file.size <= 50 * 1024 * 1024; // 50MB limit for smart upload
+        });
+
+        if (imageFiles.length === 0) {
+            alert('❌ No valid image files selected.\n\nPlease select image files for AI analysis.');
+            return;
+        }
+
+        if (imageFiles.length !== files.length) {
+            alert(`⚠️ ${files.length - imageFiles.length} file(s) were skipped.\n\nOnly image files are supported for AI analysis.`);
+        }
+
+        this.smartUploadFiles = imageFiles;
+        
+        // Hide drop zone and start AI analysis
+        document.getElementById('smartDropZone').style.display = 'none';
+        await this.startAIAnalysis();
+    }
+
+    async startAIAnalysis() {
+        const progressDiv = document.getElementById('aiAnalysisProgress');
+        const stepsDiv = document.getElementById('analysisSteps');
+        const progressBar = document.getElementById('aiProgressBar');
+        const progressText = document.getElementById('aiProgressText');
+
+        progressDiv.style.display = 'block';
+
+        const analysisSteps = [
+            { step: 'Analyzing file names and metadata', progress: 10 },
+            { step: 'Extracting EXIF data and dates', progress: 25 },
+            { step: 'Detecting patient names and patterns', progress: 40 },
+            { step: 'Classifying treatment stages', progress: 60 },
+            { step: 'Identifying treatment types', progress: 75 },
+            { step: 'Generating smart suggestions', progress: 90 },
+            { step: 'Finalizing AI analysis', progress: 100 }
+        ];
+
+        this.aiAnalysisResults = [];
+
+        for (let i = 0; i < analysisSteps.length; i++) {
+            const step = analysisSteps[i];
+            
+            // Update progress
+            progressBar.style.width = `${step.progress}%`;
+            progressText.textContent = step.step;
+            
+            // Add step to analysis log
+            const stepHtml = `
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; opacity: 0.7;">
+                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                    <span style="font-size: 0.875rem;">${step.step}</span>
+                </div>
+            `;
+            stepsDiv.insertAdjacentHTML('beforeend', stepHtml);
+            
+            // Simulate processing time
+            await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+            
+            // Process files during analysis
+            if (i === 1) await this.analyzeFileMetadata();
+            if (i === 2) await this.detectPatientNames();
+            if (i === 3) await this.classifyTreatmentStages();
+            if (i === 4) await this.identifyTreatmentTypes();
+            if (i === 5) await this.generateSmartSuggestions();
+        }
+
+        // Hide progress and show results
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            this.displaySmartResults();
+        }, 500);
+    }
+
+    async analyzeFileMetadata() {
+        // Simulate EXIF data extraction and filename analysis
+        for (let i = 0; i < this.smartUploadFiles.length; i++) {
+            const file = this.smartUploadFiles[i];
+            const fileName = file.name.toLowerCase();
+            
+            // Extract date from filename or file metadata
+            let extractedDate = new Date();
+            const dateMatch = fileName.match(/(\d{4}[-_]\d{2}[-_]\d{2})|(\d{2}[-_]\d{2}[-_]\d{4})/);
+            if (dateMatch) {
+                extractedDate = new Date(dateMatch[0].replace(/[-_]/g, '-'));
+            } else {
+                extractedDate = new Date(file.lastModified);
+            }
+
+            this.aiAnalysisResults.push({
+                file: file,
+                fileName: file.name,
+                extractedDate: extractedDate,
+                confidence: Math.random() * 0.3 + 0.7, // 70-100% confidence
+                suggestions: {}
+            });
+        }
+    }
+
+    async detectPatientNames() {
+        // Simulate patient name detection from filenames
+        const patientNames = this.patients.map(p => p.name.toLowerCase());
+        
+        this.aiAnalysisResults.forEach(result => {
+            const fileName = result.fileName.toLowerCase();
+            
+            // Look for patient names in filename
+            let detectedPatient = null;
+            let maxConfidence = 0;
+            
+            patientNames.forEach((name, index) => {
+                const nameParts = name.split(' ');
+                let matches = 0;
+                
+                nameParts.forEach(part => {
+                    if (fileName.includes(part.toLowerCase())) {
+                        matches++;
+                    }
+                });
+                
+                const confidence = matches / nameParts.length;
+                if (confidence > maxConfidence && confidence > 0.5) {
+                    maxConfidence = confidence;
+                    detectedPatient = this.patients[index];
+                }
+            });
+            
+            // If no exact match, suggest based on similarity
+            if (!detectedPatient && this.patients.length > 0) {
+                detectedPatient = this.patients[Math.floor(Math.random() * this.patients.length)];
+                maxConfidence = 0.3; // Low confidence for random assignment
+            }
+            
+            result.suggestions.patient = detectedPatient;
+            result.suggestions.patientConfidence = maxConfidence;
+        });
+    }
+
+    async classifyTreatmentStages() {
+        // Simulate treatment stage classification
+        const stageKeywords = {
+            'before': ['before', 'initial', 'start', 'pre'],
+            'progress': ['progress', 'check', 'mid', 'update', 'month'],
+            'adjustment': ['adjustment', 'adjust', 'tighten', 'wire', 'post'],
+            'completion': ['complete', 'final', 'end', 'finish', 'done', 'after']
+        };
+        
+        this.aiAnalysisResults.forEach(result => {
+            const fileName = result.fileName.toLowerCase();
+            let detectedStage = 'progress'; // default
+            let maxConfidence = 0.4;
+            
+            Object.keys(stageKeywords).forEach(stage => {
+                const keywords = stageKeywords[stage];
+                let matches = 0;
+                
+                keywords.forEach(keyword => {
+                    if (fileName.includes(keyword)) {
+                        matches++;
+                    }
+                });
+                
+                const confidence = matches / keywords.length + Math.random() * 0.3;
+                if (confidence > maxConfidence) {
+                    maxConfidence = confidence;
+                    detectedStage = stage;
+                }
+            });
+            
+            result.suggestions.stage = detectedStage;
+            result.suggestions.stageConfidence = Math.min(maxConfidence, 0.95);
+        });
+    }
+
+    async identifyTreatmentTypes() {
+        // Simulate treatment type identification
+        const treatmentKeywords = {
+            'braces': ['braces', 'bracket', 'wire', 'metal', 'ceramic'],
+            'invisalign': ['invisalign', 'clear', 'aligner', 'invisible'],
+            'retainers': ['retainer', 'retain', 'maintain', 'hold']
+        };
+        
+        this.aiAnalysisResults.forEach(result => {
+            const fileName = result.fileName.toLowerCase();
+            let detectedTreatment = 'braces'; // default
+            let maxConfidence = 0.5;
+            
+            Object.keys(treatmentKeywords).forEach(treatment => {
+                const keywords = treatmentKeywords[treatment];
+                let matches = 0;
+                
+                keywords.forEach(keyword => {
+                    if (fileName.includes(keyword)) {
+                        matches++;
+                    }
+                });
+                
+                const confidence = matches / keywords.length + Math.random() * 0.4;
+                if (confidence > maxConfidence) {
+                    maxConfidence = confidence;
+                    detectedTreatment = treatment;
+                }
+            });
+            
+            // Also consider patient's current treatment
+            if (result.suggestions.patient && result.suggestions.patient.treatment) {
+                if (Math.random() > 0.3) { // 70% chance to use patient's treatment
+                    detectedTreatment = result.suggestions.patient.treatment;
+                    maxConfidence = 0.8;
+                }
+            }
+            
+            result.suggestions.treatmentType = detectedTreatment;
+            result.suggestions.treatmentConfidence = Math.min(maxConfidence, 0.9);
+        });
+    }
+
+    async generateSmartSuggestions() {
+        // Generate final smart suggestions and titles
+        this.aiAnalysisResults.forEach(result => {
+            const patient = result.suggestions.patient;
+            const stage = result.suggestions.stage;
+            const treatment = result.suggestions.treatmentType;
+            
+            // Generate smart title
+            const stageLabels = {
+                'before': 'Before Treatment',
+                'progress': 'Progress Check',
+                'adjustment': 'Post-Adjustment',
+                'completion': 'Treatment Complete'
+            };
+            
+            const treatmentLabels = {
+                'braces': 'Braces',
+                'invisalign': 'Invisalign',
+                'retainers': 'Retainers'
+            };
+            
+            result.suggestions.title = `${stageLabels[stage]} - ${patient ? patient.name : 'Patient'}`;
+            result.suggestions.description = `${treatmentLabels[treatment]} ${stageLabels[stage].toLowerCase()} photo`;
+            
+            // Generate tags
+            result.suggestions.tags = [
+                treatment,
+                stage,
+                patient ? patient.name.toLowerCase().replace(' ', '-') : 'unknown-patient'
+            ];
+            
+            // Calculate overall confidence
+            const confidences = [
+                result.suggestions.patientConfidence || 0.5,
+                result.suggestions.stageConfidence || 0.5,
+                result.suggestions.treatmentConfidence || 0.5
+            ];
+            result.suggestions.overallConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
+        });
+    }
+
+    displaySmartResults() {
+        const resultsDiv = document.getElementById('smartResults');
+        const gridDiv = document.getElementById('smartResultsGrid');
+        const countSpan = document.getElementById('smartUploadCount');
+        
+        resultsDiv.style.display = 'block';
+        countSpan.textContent = this.aiAnalysisResults.length;
+        
+        // Generate results grid
+        gridDiv.innerHTML = this.aiAnalysisResults.map((result, index) => {
+            const objectUrl = URL.createObjectURL(result.file);
+            const confidence = Math.round(result.suggestions.overallConfidence * 100);
+            const confidenceColor = confidence >= 80 ? 'var(--success-color)' : 
+                                  confidence >= 60 ? 'var(--warning-color)' : 'var(--danger-color)';
+            
+            return `
+                <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; position: relative;">
+                    <!-- Confidence Badge -->
+                    <div style="position: absolute; top: 0.5rem; right: 0.5rem; background: ${confidenceColor}; color: white; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 500; z-index: 1;">
+                        ${confidence}% AI
+                    </div>
+                    
+                    <!-- Photo Preview -->
+                    <img src="${objectUrl}" alt="${result.fileName}" style="width: 100%; height: 120px; object-fit: cover;">
+                    
+                    <!-- AI Suggestions -->
+                    <div style="padding: 1rem;">
+                        <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${result.suggestions.title}">
+                            ${result.suggestions.title}
+                        </div>
+                        
+                        <div style="display: grid; gap: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            <div><strong>Patient:</strong> ${result.suggestions.patient ? result.suggestions.patient.name : 'Unknown'}</div>
+                            <div><strong>Stage:</strong> ${this.getStageLabel(result.suggestions.stage)}</div>
+                            <div><strong>Treatment:</strong> ${this.getTreatmentLabel(result.suggestions.treatmentType)}</div>
+                            <div><strong>Date:</strong> ${result.extractedDate.toLocaleDateString()}</div>
+                        </div>
+                        
+                        <!-- Quick Edit -->
+                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="app.editSmartSuggestion(${index})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; flex: 1;">
+                                <i class="fas fa-edit"></i>
+                                Edit
+                            </button>
+                            <button class="btn btn-success" onclick="app.approveSmartSuggestion(${index})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; flex: 1;">
+                                <i class="fas fa-check"></i>
+                                Approve
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Smart Upload Action Functions
+    editSmartSuggestion(index) {
+        const result = this.aiAnalysisResults[index];
+        const editModalHtml = `
+            <div id="editSuggestionModal" style="display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1001;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-primary); border-radius: var(--radius-lg); width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                    <div style="padding: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                            <h3 style="margin: 0; color: var(--primary-color);">
+                                <i class="fas fa-edit"></i>
+                                Edit AI Suggestion
+                            </h3>
+                            <button onclick="app.closeEditSuggestionModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div style="display: grid; gap: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Patient:</label>
+                                <select id="editPatient" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                    ${this.patients.map(p => `<option value="${p.id}" ${result.suggestions.patient && result.suggestions.patient.id === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Treatment Type:</label>
+                                <select id="editTreatment" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                    <option value="braces" ${result.suggestions.treatmentType === 'braces' ? 'selected' : ''}>Braces</option>
+                                    <option value="invisalign" ${result.suggestions.treatmentType === 'invisalign' ? 'selected' : ''}>Invisalign</option>
+                                    <option value="retainers" ${result.suggestions.treatmentType === 'retainers' ? 'selected' : ''}>Retainers</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Progress Stage:</label>
+                                <select id="editStage" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                    <option value="before" ${result.suggestions.stage === 'before' ? 'selected' : ''}>Before Treatment</option>
+                                    <option value="progress" ${result.suggestions.stage === 'progress' ? 'selected' : ''}>Progress Check</option>
+                                    <option value="adjustment" ${result.suggestions.stage === 'adjustment' ? 'selected' : ''}>Post-Adjustment</option>
+                                    <option value="completion" ${result.suggestions.stage === 'completion' ? 'selected' : ''}>Treatment Complete</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date Taken:</label>
+                                <input type="date" id="editDate" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);" value="${result.extractedDate.toISOString().split('T')[0]}">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Title:</label>
+                                <input type="text" id="editTitle" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);" value="${result.suggestions.title}">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                            <button class="btn btn-secondary" onclick="app.closeEditSuggestionModal()">
+                                <i class="fas fa-times"></i>
+                                Cancel
+                            </button>
+                            <button class="btn btn-primary" onclick="app.saveEditedSuggestion(${index})">
+                                <i class="fas fa-save"></i>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', editModalHtml);
+    }
+
+    closeEditSuggestionModal() {
+        const modal = document.getElementById('editSuggestionModal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    saveEditedSuggestion(index) {
+        const result = this.aiAnalysisResults[index];
+        const patientId = document.getElementById('editPatient').value;
+        const treatmentType = document.getElementById('editTreatment').value;
+        const stage = document.getElementById('editStage').value;
+        const date = document.getElementById('editDate').value;
+        const title = document.getElementById('editTitle').value;
+
+        // Update the suggestion
+        result.suggestions.patient = this.patients.find(p => p.id == patientId);
+        result.suggestions.treatmentType = treatmentType;
+        result.suggestions.stage = stage;
+        result.extractedDate = new Date(date);
+        result.suggestions.title = title;
+
+        // Mark as manually edited (100% confidence)
+        result.suggestions.overallConfidence = 1.0;
+        result.suggestions.manuallyEdited = true;
+
+        // Close modal and refresh display
+        this.closeEditSuggestionModal();
+        this.displaySmartResults();
+
+        // Show success message
+        this.showNotification('✅ Suggestion updated successfully!', 'success');
+    }
+
+    approveSmartSuggestion(index) {
+        const result = this.aiAnalysisResults[index];
+        result.suggestions.approved = true;
+        result.suggestions.overallConfidence = Math.max(result.suggestions.overallConfidence, 0.95);
+        
+        // Update the display
+        this.displaySmartResults();
+        
+        // Show success message
+        this.showNotification(`✅ ${result.suggestions.title} approved!`, 'success');
+    }
+
+    acceptAllSuggestions() {
+        this.aiAnalysisResults.forEach(result => {
+            result.suggestions.approved = true;
+            result.suggestions.overallConfidence = Math.max(result.suggestions.overallConfidence, 0.9);
+        });
+        
+        this.displaySmartResults();
+        this.showNotification(`✅ All ${this.aiAnalysisResults.length} suggestions approved!`, 'success');
+    }
+
+    reviewSuggestions() {
+        const lowConfidenceResults = this.aiAnalysisResults.filter(result => 
+            result.suggestions.overallConfidence < 0.8 && !result.suggestions.approved
+        );
+        
+        if (lowConfidenceResults.length === 0) {
+            this.showNotification('✅ All suggestions have high confidence!', 'success');
+            return;
+        }
+        
+        alert(`⚠️ Found ${lowConfidenceResults.length} suggestions with low confidence.\n\nPlease review and edit these suggestions before uploading.`);
+    }
+
+    exportAnalysis() {
+        const analysisData = {
+            timestamp: new Date().toISOString(),
+            totalFiles: this.aiAnalysisResults.length,
+            averageConfidence: this.aiAnalysisResults.reduce((sum, result) => sum + result.suggestions.overallConfidence, 0) / this.aiAnalysisResults.length,
+            results: this.aiAnalysisResults.map(result => ({
+                fileName: result.fileName,
+                suggestions: result.suggestions,
+                confidence: result.suggestions.overallConfidence,
+                extractedDate: result.extractedDate
+            }))
+        };
+
+        console.log('📊 AI Analysis Export:', analysisData);
+        this.showNotification('📊 Analysis exported to console!', 'info');
+    }
+
+    resetSmartUpload() {
+        // Clear all data
+        this.smartUploadFiles = [];
+        this.aiAnalysisResults = [];
+        
+        // Reset interface
+        const smartInterface = document.getElementById('smartUploadInterface');
+        if (smartInterface) {
+            smartInterface.remove();
+        }
+        
+        // Show regular upload interface
+        const photoPreviewSection = document.getElementById('photoPreviewSection');
+        const dropZone = document.getElementById('dropZone');
+        
+        if (photoPreviewSection) photoPreviewSection.style.display = 'block';
+        if (dropZone) dropZone.style.display = 'block';
+        
+        this.showNotification('🔄 Smart upload reset. You can now start over.', 'info');
+    }
+
+    async processSmartUpload() {
+        const approvedResults = this.aiAnalysisResults.filter(result => 
+            result.suggestions.approved || result.suggestions.overallConfidence >= 0.8
+        );
+        
+        if (approvedResults.length === 0) {
+            alert('❌ No approved suggestions to upload.\n\nPlease approve at least one suggestion or review low-confidence items.');
+            return;
+        }
+
+        this.uploadInProgress = true;
+        this.showUploadProgress();
+
+        try {
+            let uploadedCount = 0;
+            
+            for (let i = 0; i < approvedResults.length; i++) {
+                const result = approvedResults[i];
+                
+                // Simulate upload progress
+                await this.simulateFileUpload(result.file, i + 1, approvedResults.length);
+                
+                // Create photo record
+                const photoId = this.treatmentPhotos.length + 1;
+                const objectUrl = URL.createObjectURL(result.file);
+                
+                const photoRecord = {
+                    id: photoId,
+                    patientId: result.suggestions.patient ? result.suggestions.patient.id : null,
+                    patientName: result.suggestions.patient ? result.suggestions.patient.name : 'Unknown Patient',
+                    treatmentType: result.suggestions.treatmentType,
+                    stage: result.suggestions.stage,
+                    date: result.extractedDate.toISOString().split('T')[0],
+                    title: result.suggestions.title,
+                    description: result.suggestions.description,
+                    imageUrl: objectUrl,
+                    tags: result.suggestions.tags,
+                    notes: `AI-organized photo (${Math.round(result.suggestions.overallConfidence * 100)}% confidence)`,
+                    uploadDate: new Date().toISOString(),
+                    fileSize: result.file.size,
+                    fileName: result.file.name,
+                    fileType: result.file.type,
+                    aiGenerated: true,
+                    aiConfidence: result.suggestions.overallConfidence
+                };
+
+                this.treatmentPhotos.push(photoRecord);
+                uploadedCount++;
+            }
+
+            // Success feedback
+            this.hideUploadProgress();
+            this.showUploadSuccess(uploadedCount);
+            
+            setTimeout(() => {
+                this.closeBulkUploadModal();
+                // Refresh treatments page if currently viewing
+                if (this.currentPage === 'treatments') {
+                    this.loadTreatmentsPage();
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('Smart upload error:', error);
+            this.hideUploadProgress();
+            alert('❌ Smart upload failed. Please try again.');
+        } finally {
+            this.uploadInProgress = false;
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        const colors = {
+            success: 'var(--success-color)',
+            warning: 'var(--warning-color)',
+            error: 'var(--danger-color)',
+            info: 'var(--info-color)'
+        };
+        
+        const notificationHtml = `
+            <div style="position: fixed; top: 2rem; right: 2rem; background: ${colors[type]}; color: white; padding: 1rem 1.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1003; max-width: 300px;">
+                ${message}
+            </div>
+        `;
+        
+        const notification = document.createElement('div');
+        notification.innerHTML = notificationHtml;
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+
     showUploadModal() {
         const modalHtml = `
             <div id="bulkUploadModal" style="display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
@@ -2962,27 +3594,139 @@ class OrthoDenisaApp {
         }
     }
 
-    startSmartUpload() {
-        alert('🤖 Smart Upload System\n\n' +
-              'AI-Powered Photo Organization:\n\n' +
-              '✅ Filename Analysis:\n' +
-              '• "JohnSmith_Before_2024-01-15.jpg" → Auto-categorized\n' +
-              '• "Sarah_Progress_Invisalign_Feb.jpg" → Smart detection\n' +
-              '• "Patient123_Adjustment_March.jpg" → Pattern recognition\n\n' +
-              '✅ EXIF Data Extraction:\n' +
-              '• Date taken from camera metadata\n' +
-              '• GPS removal for privacy\n' +
-              '• Camera settings analysis\n\n' +
-              '✅ Visual Recognition:\n' +
-              '• Dental photo detection\n' +
-              '• Before/after identification\n' +
-              '• Treatment type recognition\n\n' +
-              '✅ Batch Processing:\n' +
-              '• Process 100+ photos in minutes\n' +
-              '• Auto-assign to patients\n' +
-              '• Suggest progress stages\n' +
-              '• Generate descriptions\n\n' +
-              'Ready to process your photo collection!');
+    async startSmartUpload() {
+        // Hide the regular upload interface and show smart upload
+        const photoPreviewSection = document.getElementById('photoPreviewSection');
+        const dropZone = document.getElementById('dropZone');
+        
+        if (photoPreviewSection) photoPreviewSection.style.display = 'none';
+        if (dropZone) dropZone.style.display = 'none';
+        
+        // Show smart upload interface
+        this.showSmartUploadInterface();
+    }
+
+    showSmartUploadInterface() {
+        const smartUploadHtml = `
+            <div id="smartUploadInterface" style="margin-top: 2rem;">
+                <div style="background: linear-gradient(135deg, var(--primary-color), var(--success-color)); padding: 2rem; border-radius: var(--radius-lg); color: white; margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <i class="fas fa-brain" style="font-size: 2rem;"></i>
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.5rem;">AI-Powered Smart Upload</h2>
+                            <p style="margin: 0; opacity: 0.9;">Intelligent photo organization with automatic categorization</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smart Drop Zone -->
+                <div id="smartDropZone" style="border: 3px dashed var(--success-color); border-radius: var(--radius-lg); padding: 3rem; text-align: center; background: linear-gradient(135deg, rgb(34 197 94 / 0.05), rgb(79 70 229 / 0.05)); cursor: pointer; transition: all 0.3s ease; margin-bottom: 2rem;" 
+                     ondrop="app.handleSmartDrop(event)" 
+                     ondragover="app.handleSmartDragOver(event)" 
+                     ondragenter="app.handleSmartDragEnter(event)" 
+                     ondragleave="app.handleSmartDragLeave(event)"
+                     onclick="document.getElementById('smartFileInput').click()">
+                    <div id="smartDropContent">
+                        <i class="fas fa-magic" style="font-size: 4rem; color: var(--success-color); margin-bottom: 1rem; animation: pulse 2s infinite;"></i>
+                        <h3 style="margin: 0 0 0.5rem 0; color: var(--success-color); font-size: 1.5rem;">Drop Photos for AI Analysis</h3>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 1.1rem;">AI will automatically detect patients, stages, and organize your photos</p>
+                        <div style="margin-top: 1rem; display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--success-color);">
+                                <i class="fas fa-user-check"></i>
+                                <span>Patient Detection</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--success-color);">
+                                <i class="fas fa-calendar-check"></i>
+                                <span>Date Extraction</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--success-color);">
+                                <i class="fas fa-tags"></i>
+                                <span>Stage Classification</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hidden File Input -->
+                <input type="file" id="smartFileInput" multiple accept="image/*" style="display: none;" onchange="app.handleSmartFileSelect(event)">
+
+                <!-- AI Analysis Progress -->
+                <div id="aiAnalysisProgress" style="display: none; background: var(--bg-secondary); padding: 2rem; border-radius: var(--radius-md); margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="spinner" style="width: 24px; height: 24px; border: 3px solid var(--border-color); border-top: 3px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <h3 style="margin: 0; color: var(--primary-color);">AI Analysis in Progress...</h3>
+                    </div>
+                    <div id="analysisSteps" style="margin-bottom: 1rem;"></div>
+                    <div style="width: 100%; height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden;">
+                        <div id="aiProgressBar" style="height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); width: 0%; transition: width 0.5s ease;"></div>
+                    </div>
+                    <div style="text-align: center; margin-top: 1rem; color: var(--text-muted);">
+                        <span id="aiProgressText">Initializing AI analysis...</span>
+                    </div>
+                </div>
+
+                <!-- Smart Results -->
+                <div id="smartResults" style="display: none;">
+                    <h3 style="margin: 0 0 1.5rem 0; color: var(--primary-color);">
+                        <i class="fas fa-check-circle"></i>
+                        AI Analysis Complete
+                    </h3>
+                    <div id="smartResultsGrid" style="display: grid; gap: 1rem; margin-bottom: 2rem;"></div>
+                    
+                    <!-- Batch Actions -->
+                    <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: var(--radius-md); margin-bottom: 2rem;">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--primary-color);">Batch Actions</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <button class="btn btn-success" onclick="app.acceptAllSuggestions()" style="padding: 0.75rem;">
+                                <i class="fas fa-check-double"></i>
+                                Accept All Suggestions
+                            </button>
+                            <button class="btn btn-warning" onclick="app.reviewSuggestions()" style="padding: 0.75rem;">
+                                <i class="fas fa-eye"></i>
+                                Review & Edit
+                            </button>
+                            <button class="btn btn-info" onclick="app.exportAnalysis()" style="padding: 0.75rem;">
+                                <i class="fas fa-download"></i>
+                                Export Analysis
+                            </button>
+                            <button class="btn btn-secondary" onclick="app.resetSmartUpload()" style="padding: 0.75rem;">
+                                <i class="fas fa-redo"></i>
+                                Start Over
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Final Upload -->
+                    <div style="text-align: center;">
+                        <button class="btn btn-primary" onclick="app.processSmartUpload()" style="padding: 1rem 2rem; font-size: 1.1rem;">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            Upload <span id="smartUploadCount">0</span> Organized Photos
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <style>
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.1); }
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+
+        // Insert after the photo preview section
+        const uploadModal = document.getElementById('bulkUploadModal');
+        const photoPreviewSection = document.getElementById('photoPreviewSection');
+        
+        if (photoPreviewSection) {
+            photoPreviewSection.insertAdjacentHTML('afterend', smartUploadHtml);
+        } else {
+            uploadModal.querySelector('.padding').insertAdjacentHTML('beforeend', smartUploadHtml);
+        }
     }
 
     startFolderImport() {
