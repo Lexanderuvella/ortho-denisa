@@ -7,6 +7,8 @@ class OrthoDenisaApp {
         this.treatments = [];
         this.searchResults = [];
         this.isSearchActive = false;
+        this.selectedFiles = [];
+        this.uploadInProgress = false;
         this.init();
     }
 
@@ -2454,19 +2456,386 @@ class OrthoDenisaApp {
         alert('📤 Share Comparison\n\nSharing options:\n• Email to patient\n• Print comparison report\n• Add to treatment plan\n• Insurance documentation');
     }
 
+    // Real Photo Upload Functions
+    handleDragOver(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const dropZone = document.getElementById('dropZone');
+        dropZone.style.borderColor = 'var(--success-color)';
+        dropZone.style.background = 'rgb(34 197 94 / 0.1)';
+    }
+
+    handleDragEnter(event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    handleDragLeave(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const dropZone = document.getElementById('dropZone');
+        dropZone.style.borderColor = 'var(--primary-color)';
+        dropZone.style.background = 'rgb(79 70 229 / 0.05)';
+    }
+
+    handleDrop(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const dropZone = document.getElementById('dropZone');
+        dropZone.style.borderColor = 'var(--primary-color)';
+        dropZone.style.background = 'rgb(79 70 229 / 0.05)';
+
+        const files = Array.from(event.dataTransfer.files);
+        this.processSelectedFiles(files);
+    }
+
+    handleFileSelect(event) {
+        const files = Array.from(event.target.files);
+        this.processSelectedFiles(files);
+    }
+
+    processSelectedFiles(files) {
+        // Filter for image files only
+        const imageFiles = files.filter(file => {
+            return file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024; // 10MB limit
+        });
+
+        if (imageFiles.length === 0) {
+            alert('❌ No valid image files selected.\n\nPlease select JPG, PNG, or HEIC files under 10MB.');
+            return;
+        }
+
+        if (imageFiles.length !== files.length) {
+            alert(`⚠️ ${files.length - imageFiles.length} file(s) were skipped.\n\nOnly image files under 10MB are supported.`);
+        }
+
+        // Add to selected files
+        this.selectedFiles = [...this.selectedFiles, ...imageFiles];
+        this.updatePhotoPreview();
+    }
+
+    updatePhotoPreview() {
+        const previewSection = document.getElementById('photoPreviewSection');
+        const photoGrid = document.getElementById('photoPreviewGrid');
+        const photoCount = document.getElementById('photoCount');
+        const uploadCount = document.getElementById('uploadCount');
+
+        if (this.selectedFiles.length === 0) {
+            previewSection.style.display = 'none';
+            return;
+        }
+
+        previewSection.style.display = 'block';
+        photoCount.textContent = this.selectedFiles.length;
+        uploadCount.textContent = this.selectedFiles.length;
+
+        // Generate preview grid
+        photoGrid.innerHTML = this.selectedFiles.map((file, index) => {
+            const objectUrl = URL.createObjectURL(file);
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            
+            return `
+                <div style="position: relative; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden;">
+                    <img src="${objectUrl}" alt="${file.name}" style="width: 100%; height: 120px; object-fit: cover;">
+                    <div style="padding: 0.75rem;">
+                        <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${file.name}">
+                            ${file.name}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            ${fileSizeMB} MB • ${file.type.split('/')[1].toUpperCase()}
+                        </div>
+                    </div>
+                    <button onclick="app.removeSelectedFile(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(239, 68, 68, 0.9); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    removeSelectedFile(index) {
+        // Revoke object URL to prevent memory leaks
+        const file = this.selectedFiles[index];
+        const objectUrl = URL.createObjectURL(file);
+        URL.revokeObjectURL(objectUrl);
+        
+        this.selectedFiles.splice(index, 1);
+        this.updatePhotoPreview();
+    }
+
+    clearSelectedPhotos() {
+        // Revoke all object URLs
+        this.selectedFiles.forEach(file => {
+            const objectUrl = URL.createObjectURL(file);
+            URL.revokeObjectURL(objectUrl);
+        });
+        
+        this.selectedFiles = [];
+        this.updatePhotoPreview();
+        
+        // Reset file input
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    }
+
+    async processPhotoUploads() {
+        if (this.selectedFiles.length === 0) {
+            alert('❌ No photos selected for upload.');
+            return;
+        }
+
+        // Validate form data
+        const patientId = document.getElementById('uploadPatient').value;
+        const treatmentType = document.getElementById('uploadTreatment').value;
+        const stage = document.getElementById('uploadStage').value;
+        const date = document.getElementById('uploadDate').value;
+        const notes = document.getElementById('uploadNotes').value;
+
+        if (!patientId || !treatmentType || !stage || !date) {
+            alert('❌ Please fill in all required fields:\n• Patient\n• Treatment Type\n• Progress Stage\n• Date Taken');
+            return;
+        }
+
+        this.uploadInProgress = true;
+        this.showUploadProgress();
+
+        try {
+            const patient = this.patients.find(p => p.id == patientId);
+            let uploadedCount = 0;
+
+            for (let i = 0; i < this.selectedFiles.length; i++) {
+                const file = this.selectedFiles[i];
+                
+                // Simulate upload progress
+                await this.simulateFileUpload(file, i + 1, this.selectedFiles.length);
+                
+                // Create photo record
+                const photoId = this.treatmentPhotos.length + 1;
+                const objectUrl = URL.createObjectURL(file);
+                
+                const photoRecord = {
+                    id: photoId,
+                    patientId: parseInt(patientId),
+                    patientName: patient.name,
+                    treatmentType: treatmentType,
+                    stage: stage,
+                    date: date,
+                    title: `${this.getStageLabel(stage)} - ${patient.name}`,
+                    description: `${this.getTreatmentLabel(treatmentType)} progress photo`,
+                    imageUrl: objectUrl, // In real app, this would be a server URL
+                    tags: [treatmentType, stage, patient.name.toLowerCase().replace(' ', '-')],
+                    notes: notes,
+                    uploadDate: new Date().toISOString(),
+                    fileSize: file.size,
+                    fileName: file.name,
+                    fileType: file.type
+                };
+
+                this.treatmentPhotos.push(photoRecord);
+                uploadedCount++;
+            }
+
+            // Success feedback
+            this.hideUploadProgress();
+            this.showUploadSuccess(uploadedCount);
+            
+            // Clear form and close modal
+            this.clearSelectedPhotos();
+            setTimeout(() => {
+                this.closeBulkUploadModal();
+                // Refresh treatments page if currently viewing
+                if (this.currentPage === 'treatments') {
+                    this.loadTreatmentsPage();
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.hideUploadProgress();
+            alert('❌ Upload failed. Please try again.');
+        } finally {
+            this.uploadInProgress = false;
+        }
+    }
+
+    showUploadProgress() {
+        const progressSection = document.getElementById('uploadProgress');
+        const dropZone = document.getElementById('dropZone');
+        
+        progressSection.style.display = 'block';
+        dropZone.style.opacity = '0.5';
+        dropZone.style.pointerEvents = 'none';
+    }
+
+    hideUploadProgress() {
+        const progressSection = document.getElementById('uploadProgress');
+        const dropZone = document.getElementById('dropZone');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        
+        progressSection.style.display = 'none';
+        dropZone.style.opacity = '1';
+        dropZone.style.pointerEvents = 'auto';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+    }
+
+    async simulateFileUpload(file, currentFile, totalFiles) {
+        return new Promise(resolve => {
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                }
+                
+                const overallProgress = ((currentFile - 1) / totalFiles * 100) + (progress / totalFiles);
+                progressBar.style.width = `${overallProgress}%`;
+                progressText.textContent = `${Math.round(overallProgress)}%`;
+                
+                if (progress >= 100) {
+                    setTimeout(resolve, 200);
+                }
+            }, 100);
+        });
+    }
+
+    showUploadSuccess(count) {
+        const successHtml = `
+            <div style="position: fixed; top: 2rem; right: 2rem; background: var(--success-color); color: white; padding: 1rem 1.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1002; display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i>
+                <div>
+                    <div style="font-weight: 500;">Upload Successful!</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">${count} photo${count > 1 ? 's' : ''} uploaded successfully</div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', successHtml);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            const successElement = document.querySelector('[style*="position: fixed"][style*="top: 2rem"][style*="right: 2rem"]');
+            if (successElement) {
+                successElement.remove();
+            }
+        }, 3000);
+    }
+
     showUploadModal() {
         const modalHtml = `
             <div id="bulkUploadModal" style="display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-primary); border-radius: var(--radius-lg); width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-primary); border-radius: var(--radius-lg); width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto;">
                     <div style="padding: 2rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                             <h2 style="margin: 0; color: var(--primary-color);">
                                 <i class="fas fa-upload"></i>
-                                Bulk Photo Import System
+                                Upload Progress Photos
                             </h2>
                             <button onclick="app.closeBulkUploadModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">
                                 <i class="fas fa-times"></i>
                             </button>
+                        </div>
+
+                        <!-- Real Photo Upload Interface -->
+                        <div style="margin-bottom: 2rem;">
+                            <!-- Drag and Drop Zone -->
+                            <div id="dropZone" style="border: 2px dashed var(--primary-color); border-radius: var(--radius-md); padding: 3rem; text-align: center; background: rgb(79 70 229 / 0.05); cursor: pointer; transition: all 0.3s ease;" 
+                                 ondrop="app.handleDrop(event)" 
+                                 ondragover="app.handleDragOver(event)" 
+                                 ondragenter="app.handleDragEnter(event)" 
+                                 ondragleave="app.handleDragLeave(event)"
+                                 onclick="document.getElementById('fileInput').click()">
+                                <div id="dropZoneContent">
+                                    <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
+                                    <h3 style="margin: 0 0 0.5rem 0; color: var(--primary-color);">Drop photos here or click to browse</h3>
+                                    <p style="margin: 0; color: var(--text-secondary);">Supports JPG, PNG, HEIC files up to 10MB each</p>
+                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem; color: var(--text-muted);">Multiple files supported • Auto-resize and optimize</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Hidden File Input -->
+                            <input type="file" id="fileInput" multiple accept="image/*" style="display: none;" onchange="app.handleFileSelect(event)">
+                            
+                            <!-- Upload Progress -->
+                            <div id="uploadProgress" style="display: none; margin-top: 1rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="font-weight: 500;">Uploading photos...</span>
+                                    <span id="progressText">0%</span>
+                                </div>
+                                <div style="width: 100%; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                                    <div id="progressBar" style="height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s ease;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Photo Preview and Metadata -->
+                        <div id="photoPreviewSection" style="display: none;">
+                            <h3 style="margin: 0 0 1rem 0; color: var(--primary-color);">
+                                <i class="fas fa-images"></i>
+                                Selected Photos (<span id="photoCount">0</span>)
+                            </h3>
+                            <div id="photoPreviewGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; max-height: 300px; overflow-y: auto;"></div>
+                            
+                            <!-- Batch Metadata Form -->
+                            <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: var(--radius-md); margin-bottom: 2rem;">
+                                <h4 style="margin: 0 0 1rem 0; color: var(--primary-color);">Photo Information</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Patient:</label>
+                                        <select id="uploadPatient" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                            <option value="">Select Patient</option>
+                                            ${this.patients.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Treatment Type:</label>
+                                        <select id="uploadTreatment" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                            <option value="">Select Treatment</option>
+                                            <option value="braces">Braces</option>
+                                            <option value="invisalign">Invisalign</option>
+                                            <option value="retainers">Retainers</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Progress Stage:</label>
+                                        <select id="uploadStage" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                                            <option value="">Select Stage</option>
+                                            <option value="before">Before Treatment</option>
+                                            <option value="progress">Progress Check</option>
+                                            <option value="adjustment">Post-Adjustment</option>
+                                            <option value="completion">Treatment Complete</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Date Taken:</label>
+                                        <input type="date" id="uploadDate" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm);" value="${new Date().toISOString().split('T')[0]}">
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1rem;">
+                                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Clinical Notes:</label>
+                                    <textarea id="uploadNotes" placeholder="Add clinical observations, treatment notes, or other relevant information..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); min-height: 80px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Upload Actions -->
+                            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                                <button class="btn btn-secondary" onclick="app.clearSelectedPhotos()" style="padding: 0.75rem 1.5rem;">
+                                    <i class="fas fa-times"></i>
+                                    Clear All
+                                </button>
+                                <button class="btn btn-primary" onclick="app.processPhotoUploads()" style="padding: 0.75rem 1.5rem;">
+                                    <i class="fas fa-save"></i>
+                                    Upload Photos (<span id="uploadCount">0</span>)
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Import Options -->

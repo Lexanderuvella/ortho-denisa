@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🦷 Ortho-Denisa | Orthodontist Practice Management System
 
 A comprehensive, modern web application designed specifically for orthodontic practices. Built with vanilla JavaScript, HTML5, and CSS3 for optimal performance and ease of deployment.
@@ -191,3 +192,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Ready to transform your orthodontic practice? Get started today!** 🚀
+=======
+# ortho-denisa
+organizer for doctors 
+>>>>>>> fd88e116b1c7846eae2a6d121512212f7f54a243
